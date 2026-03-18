@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cue Editor</title>
+    <script src="jspdf.umd.min.js"></script>
+    <script src="jspdf.plugin.autotable.min.js"></script>
+    <style>
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, sans-serif;
+    }
+    .metadata {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    body {
+      margin: 20px;
+      background: #0F141B;
+      color: #fff;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background-color: #0F141B;
+      padding: 3px;
+    }
+
+    form {
+      display: grid;
+      grid-template-columns: 80px 100px 2fr 1fr 1fr 1fr auto;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    input {
+      padding: 6px 8px;
+      background: #144478;
+      border: 1px solid #2A1F18;
+      color: #fff;
+    }
+
+    input::placeholder {
+      color: #c1c0c0;
+    }
+
+    button {
+      padding: 6px 10px;
+      background: #26558a;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #3c6ba0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    th, td {
+      border: 0px solid #0F141B;
+      padding: 6px 8px;
+      vertical-align: top;
+    }
+
+    th {
+      background: #144478;
+      font-weight: 600;
+    }
+
+    tbody tr:nth-child(odd) {
+      background: #0F141B;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #212a36;
+    }
+
+    .col-actions {
+      width: 70px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .col-scene {
+      width: 70px;
+      white-space: nowrap;
+    }
+
+    .col-subscene {
+      width: 90px;
+      white-space: nowrap;
+    }
+
+    .actions button {
+      margin: 0 2px;
+      padding: 2px 6px;
+      font-size: 12px;
+    }
+
+    /* ---------- BOTONES INFERIORES ---------- */
+    .footer-actions {
+      display: flex;
+      gap: 10px;
+      position: sticky;
+      bottom: 0;
+      background-color: #0F141B;
+    }
+
+    .danger {
+      background: #FF4D4D;
+    }
+
+    .danger:hover {
+      background: #b92d2d;
+    }
+
+    tr.active-cue {
+      background-color: blue !important;
+      color: white;
+    }
+    .footer-actions select {
+  padding: 6px 10px;
+  background: #26558a;
+  color: #eee;
+}
+
+.footer-actions select option {
+  background: #26558a;
+  color: #eee;
+}
+  </style>
+</head>
+
+<body>
+<header>
+  <div class="metadata">
+    <input id="title" placeholder="Título de la obra">
+    <input id="tech" placeholder="Técnico">
+    <input id="email" placeholder="Email">
+    <input id="phone" placeholder="Teléfono">
+    <input id="revision" type="date" aria-label="Fecha de revisión">
+  </div>
+  <!-- ---------- FORMULARIO ---------- -->
+  <form id="cueForm">
+    <input type="number" id="scene" placeholder="Escena" required>
+    <input type="number" id="subscene" placeholder="Sub-escena" step="0.1" required>
+    <input type="text" id="trigger" placeholder="Trigger (frase, acción, evento)" required>
+    <input type="text" id="lights" placeholder="Iluminación">
+    <input type="text" id="audio" placeholder="Música">
+    <input type="text" id="video" placeholder="Proyección">
+    <button type="submit">Añadir</button>
+  </form>
+</header>
+  <!-- ---------- TABLA ---------- -->
+  <table>
+    <thead>
+      <tr>
+        <th class="col-actions"></th>
+        <th class="col-scene">Escena</th>
+        <th class="col-subscene">Sub-escena</th>
+        <th>Trigger</th>
+        <th>Luces</th>
+        <th>Audio</th>
+        <th>Vídeo</th>
+      </tr>
+    </thead>
+    <tbody id="cueTableBody"></tbody>
+  </table>
+
+  <!-- ---------- ACCIONES ---------- -->
+  <div class="footer-actions">
+    <button id="reset" class="danger">Borrar obra</button>
+    <button id="export">Exportar PDF</button>
+    <button id="exportData">Exportar JSON</button>
+    <button id="importData">Importar JSON</button>
+    <button onclick="prevCueHighlight()">GO -</button>
+    <button onclick="nextCueHighlight()">GO +</button>
+    <select id="cueSelector"></select>
+  </div>
+
+  <script>
+    
+    const { jsPDF } = window.jspdf;
+    const cueSelector = document.getElementById("cueSelector");
+    
+    let cues = [];
+    let storedIndex = localStorage.getItem("activeCueIndex");
+    let activeIndex = storedIndex !== null ? Number(storedIndex) : -1;
+    const metaFields = ["title","tech","email","phone","revision"];
+
+    const form = document.getElementById("cueForm");
+    const tableBody = document.getElementById("cueTableBody");
+
+    function saveMeta() {
+  const meta = {};
+  metaFields.forEach(id => meta[id] = document.getElementById(id).value);
+  localStorage.setItem("theatreMeta", JSON.stringify(meta));
+}
+
+function loadMeta() {
+  const saved = localStorage.getItem("theatreMeta");
+  if (!saved) return;
+  const meta = JSON.parse(saved);
+  metaFields.forEach(id => document.getElementById(id).value = meta[id] || "");
+}
+
+metaFields.forEach(id =>
+  document.getElementById(id).addEventListener("input", saveMeta)
+);
+
+loadMeta();
+
+function sortCues() {
+  cues.sort((a, b) => {
+    if (a.scene !== b.scene) return a.scene - b.scene;
+    return a.subscene - b.subscene;
+  });
+}
+
+    /* ---------- CARGA ---------- */
+const saved = localStorage.getItem("theatreCues");
+if (saved) {
+  cues = JSON.parse(saved);
+  renderTable();
+} else {
+  updateCueSelector(); // inicializa el select aunque esté vacío
+}
+
+
+    /* ---------- AÑADIR ---------- */
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+function insertCue(cue) {
+  // Busca el índice correcto
+  let index = cues.findIndex(c => {
+    if (cue.scene < c.scene) return true;
+    if (cue.scene === c.scene && cue.subscene < c.subscene) return true;
+    return false;
+  });
+  if (index === -1) cues.push(cue); // va al final
+  else cues.splice(index, 0, cue); // inserta en la posición correcta
+}
+
+
+const newCue = {
+  scene: Number(scene.value),
+  subscene: Number(subscene.value),
+  trigger: trigger.value.trim(),
+  lights: lights.value.trim(),
+  audio: audio.value.trim(),
+  video: video.value.trim()
+};
+insertCue(newCue);
+saveAndRender();
+      form.reset();
+      scene.focus();
+    });
+
+    /* ---------- RENDER ---------- */
+    function renderTable() {
+      tableBody.innerHTML = "";
+
+      cues.forEach((c, index) => {
+        const row = document.createElement("tr");
+
+        if (index === activeIndex) {
+          row.classList.add("active-cue");
+        }
+
+        row.innerHTML = `
+          <td class="col-actions actions">
+            <button onclick="moveUp(${index})">↑</button>
+            <button onclick="moveDown(${index})">↓</button>
+            <button onclick="removeCue(${index})">✕</button>
+          </td>
+          <td class="col-scene">${c.scene}</td>
+          <td class="col-subscene">${c.subscene}</td>
+          <td contenteditable="true" onblur="editCue(${index}, 'trigger', this.innerText)">${c.trigger}</td>
+          <td contenteditable="true" onblur="editCue(${index}, 'lights', this.innerText)">${c.lights || ""}</td>
+          <td contenteditable="true" onblur="editCue(${index}, 'audio', this.innerText)">${c.audio || ""}</td>
+          <td contenteditable="true" onblur="editCue(${index}, 'video', this.innerText)">${c.video || ""}</td>
+        `;
+
+        tableBody.appendChild(row);
+      });
+      updateCueSelector();
+    }
+
+    /* ---------- REORDENAR ---------- */
+function moveUp(index) {
+  if (index === 0) return;
+
+  // intercambiar objetos completos
+  [cues[index - 1], cues[index]] = [cues[index], cues[index - 1]];
+
+  // intercambiar también los números de escena y sub-escena
+  [cues[index - 1].scene, cues[index].scene] = [cues[index].scene, cues[index - 1].scene];
+  [cues[index - 1].subscene, cues[index].subscene] = [cues[index].subscene, cues[index - 1].subscene];
+
+  saveAndRender();
+}
+
+function moveDown(index) {
+  if (index === cues.length - 1) return;
+
+  // intercambiar objetos completos
+  [cues[index + 1], cues[index]] = [cues[index], cues[index + 1]];
+
+  // intercambiar también los números de escena y sub-escena
+  [cues[index + 1].scene, cues[index].scene] = [cues[index].scene, cues[index + 1].scene];
+  [cues[index + 1].subscene, cues[index].subscene] = [cues[index].subscene, cues[index + 1].subscene];
+
+  saveAndRender();
+}
+
+    function removeCue(index) {
+      if (!confirm("¿Borrar este cue?")) return;
+      cues.splice(index, 1);
+      saveAndRender();
+    }
+
+    /* ---------- SUB-ESCENAS ---------- */
+
+    /* ---------- GUARDAR ---------- */
+    function saveAndRender() {
+      localStorage.setItem("theatreCues", JSON.stringify(cues));
+      renderTable();
+      updateCueSelector();
+    }
+
+    /* ---------- RESET ---------- */
+    document.getElementById("reset").addEventListener("click", () => {
+      if (confirm("¿Seguro que quieres borrar esta obra? Asegurate de haber exportado primero")) {
+        cues = [];
+        activeIndex = -1;
+        localStorage.removeItem("theatreCues");
+        localStorage.removeItem("activeCueIndex");
+        renderTable();
+      }
+    });
+
+
+const exportBtn = document.getElementById("export");
+
+exportBtn.addEventListener("click", () => {  
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm" });
+
+  // ---------- CABECERA ----------
+  const titleText = title.value || "Guion técnico";
+  doc.setFontSize(16);
+  doc.text(titleText, 15, 15);
+
+  // cabecera técnica en una línea, texto más pequeño
+  doc.setFontSize(10);
+  const metaText = `Última revisión: ${revision.value || ""} | Producción técnica por: ${tech.value || ""} | Contacto: ${email.value || ""} | ${phone.value || ""} `;
+  doc.text(metaText, 15, 22);
+
+  // ---------- TABLA ----------
+  doc.autoTable({
+    startY: 28,
+    head: [[
+      "Escena",
+      "Trigger",
+      "Luces",
+      "Audio",
+      "Vídeo"
+    ]],
+    body: cues.map(c => [
+      c.scene,
+      c.trigger,
+      c.lights || "",
+      c.audio || "",
+      c.video || ""
+    ]),
+    styles: {
+      fontSize: 11,  
+      cellPadding: 1.5,
+      textColor: 0, 
+      halign: 'center'     
+    },
+    headStyles: {
+      fillColor: [175, 175, 175],
+      textColor: 0,
+      halign: 'center'
+    },
+    columnStyles: { 
+      0: { cellWidth: 17 },
+    },
+    margin: { left: 10, right: 10 },
+    didParseCell: function (data) {
+  if (data.section === 'body') {
+
+    const rowIndex = data.row.index;
+
+    // Fila par = blanca
+    if (rowIndex % 2 === 0) {
+      data.cell.styles.fillColor = [255, 255, 255];
+    } else {
+      // Fila impar = color rotativo
+      const colorCycle = [
+        [143, 184, 226], // azul claro
+        [227, 133, 135], // rojo claro
+        [254, 210, 84],  // amarillo claro
+        [168, 208, 151]  // verde claro
+      ];
+
+      const colorIndex = Math.floor(rowIndex / 2) % 4;
+      data.cell.styles.fillColor = colorCycle[colorIndex];
+    }
+  }
+},
+
+  });
+
+  // ---------- GUARDAR PDF ----------
+  const safeTitle = titleText.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  doc.save(`guion-tecnico-${safeTitle}.pdf`);
+});
+
+
+const exportDataBtn = document.getElementById("exportData");
+
+exportDataBtn.addEventListener("click", () => {
+  const data = {
+    meta: {},
+    cues: cues
+  };
+
+  // guardar campos de cabecera
+  metaFields.forEach(id => {
+    data.meta[id] = document.getElementById(id).value;
+  });
+
+  const jsonStr = JSON.stringify(data, null, 2); // identado para legibilidad
+
+  const blob = new Blob([jsonStr], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  const titleText = document.getElementById("title").value || "Guion técnico";
+  const safeTitle = titleText.replace(/[^a-z0-9]/gi, '_').toLowerCase();  a.download = `guion-tecnico-${safeTitle}-datos.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+const importDataBtn = document.getElementById("importData");
+
+importDataBtn.addEventListener("click", () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".json";
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = event => {
+      try {
+        const data = JSON.parse(event.target.result);
+        if (data.meta) {
+          metaFields.forEach(id => document.getElementById(id).value = data.meta[id] || "");
+        }
+        if (Array.isArray(data.cues)) {
+          cues = data.cues;
+          saveAndRender();
+        } else {
+          alert("Archivo JSON inválido: no contiene cues");
+        }
+      } catch (err) {
+        alert("Error leyendo el archivo JSON");
+        console.error(err);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+});
+
+function editCue(index, field, value) {
+  if (!cues[index]) return;
+  cues[index][field] = value.trim();
+  localStorage.setItem("theatreCues", JSON.stringify(cues));
+}
+
+function nextCueHighlight() {
+  if (activeIndex < cues.length - 1) {
+    activeIndex++;
+    localStorage.setItem("activeCueIndex", activeIndex);
+    renderTable();
+    updateCueSelector();
+  }
+}
+
+function prevCueHighlight() {
+  if (activeIndex > 0) {
+    activeIndex--;
+    localStorage.setItem("activeCueIndex", activeIndex);
+    renderTable();
+    updateCueSelector();
+  }
+}
+
+if (cueSelector) {
+  cueSelector.addEventListener("change", function () {
+    activeIndex = Number(this.value);
+    localStorage.setItem("activeCueIndex", activeIndex);
+    renderTable();
+  });
+}
+
+function updateCueSelector() {
+  if (!cueSelector) return;
+
+  cueSelector.innerHTML = "";
+
+  if (cues.length === 0) {
+    const placeholder = document.createElement("option");
+    placeholder.textContent = "-- No hay cues --";
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    cueSelector.appendChild(placeholder);
+    return;
+  }
+
+  cues.forEach((c, index) => {
+    const option = document.createElement("option");
+    option.value = index;
+    option.textContent = `Escena ${c.scene}.${c.subscene}`;
+    cueSelector.appendChild(option);
+  });
+
+  if (activeIndex >= 0 && activeIndex < cues.length) {
+    cueSelector.value = activeIndex;
+  }
+}
+
+
+
+  </script>
+
+</body>
+</html>
