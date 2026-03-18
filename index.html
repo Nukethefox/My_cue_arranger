@@ -108,7 +108,6 @@
       font-size: 12px;
     }
 
-    /* ---------- BOTONES INFERIORES ---------- */
     .footer-actions {
       display: flex;
       gap: 10px;
@@ -145,45 +144,42 @@
 <body>
 <header>
   <div class="metadata">
-    <input id="title" placeholder="Título de la obra">
-    <input id="tech" placeholder="Técnico">
+    <input id="title" placeholder="Production name">
+    <input id="tech" placeholder="Script created by...">
     <input id="email" placeholder="Email">
-    <input id="phone" placeholder="Teléfono">
-    <input id="revision" type="date" aria-label="Fecha de revisión">
+    <input id="phone" placeholder="Phone">
+    <input id="revision" type="date" aria-label="Last revision date">
   </div>
-  <!-- ---------- FORMULARIO ---------- -->
   <form id="cueForm">
-    <input type="number" id="scene" placeholder="Escena" required>
-    <input type="number" id="subscene" placeholder="Sub-escena" step="0.1" required>
-    <input type="text" id="trigger" placeholder="Trigger (frase, acción, evento)" required>
-    <input type="text" id="lights" placeholder="Iluminación">
-    <input type="text" id="audio" placeholder="Música">
-    <input type="text" id="video" placeholder="Proyección">
-    <button type="submit">Añadir</button>
+    <input type="number" id="scene" placeholder="Scene" required>
+    <input type="number" id="subscene" placeholder="Sub-scene" step="0.1" required>
+    <input type="text" id="trigger" placeholder="Trigger" required>
+    <input type="text" id="lights" placeholder="Lights">
+    <input type="text" id="audio" placeholder="Audio">
+    <input type="text" id="video" placeholder="Video">
+    <button type="submit">ADD CUE</button>
   </form>
 </header>
-  <!-- ---------- TABLA ---------- -->
   <table>
     <thead>
       <tr>
         <th class="col-actions"></th>
-        <th class="col-scene">Escena</th>
-        <th class="col-subscene">Sub-escena</th>
+        <th class="col-scene">Scene</th>
+        <th class="col-subscene">Sub-scene</th>
         <th>Trigger</th>
-        <th>Luces</th>
+        <th>Light</th>
         <th>Audio</th>
-        <th>Vídeo</th>
+        <th>Video</th>
       </tr>
     </thead>
     <tbody id="cueTableBody"></tbody>
   </table>
 
-  <!-- ---------- ACCIONES ---------- -->
   <div class="footer-actions">
-    <button id="reset" class="danger">Borrar obra</button>
-    <button id="export">Exportar PDF</button>
-    <button id="exportData">Exportar JSON</button>
-    <button id="importData">Importar JSON</button>
+    <button id="reset" class="danger">Delete all</button>
+    <button id="export">Export PDF</button>
+    <button id="exportData">Export JSON</button>
+    <button id="importData">Import JSON</button>
     <button onclick="prevCueHighlight()">GO -</button>
     <button onclick="nextCueHighlight()">GO +</button>
     <select id="cueSelector"></select>
@@ -228,7 +224,6 @@ function sortCues() {
   });
 }
 
-    /* ---------- CARGA ---------- */
 const saved = localStorage.getItem("theatreCues");
 if (saved) {
   cues = JSON.parse(saved);
@@ -238,19 +233,17 @@ if (saved) {
 }
 
 
-    /* ---------- AÑADIR ---------- */
     form.addEventListener("submit", (e) => {
       e.preventDefault();
 
 function insertCue(cue) {
-  // Busca el índice correcto
   let index = cues.findIndex(c => {
     if (cue.scene < c.scene) return true;
     if (cue.scene === c.scene && cue.subscene < c.subscene) return true;
     return false;
   });
-  if (index === -1) cues.push(cue); // va al final
-  else cues.splice(index, 0, cue); // inserta en la posición correcta
+  if (index === -1) cues.push(cue); 
+  else cues.splice(index, 0, cue); 
 }
 
 
@@ -268,7 +261,6 @@ saveAndRender();
       scene.focus();
     });
 
-    /* ---------- RENDER ---------- */
     function renderTable() {
       tableBody.innerHTML = "";
 
@@ -298,7 +290,6 @@ saveAndRender();
       updateCueSelector();
     }
 
-    /* ---------- REORDENAR ---------- */
 function moveUp(index) {
   if (index === 0) return;
 
@@ -315,10 +306,8 @@ function moveUp(index) {
 function moveDown(index) {
   if (index === cues.length - 1) return;
 
-  // intercambiar objetos completos
   [cues[index + 1], cues[index]] = [cues[index], cues[index + 1]];
 
-  // intercambiar también los números de escena y sub-escena
   [cues[index + 1].scene, cues[index].scene] = [cues[index].scene, cues[index + 1].scene];
   [cues[index + 1].subscene, cues[index].subscene] = [cues[index].subscene, cues[index + 1].subscene];
 
@@ -331,18 +320,14 @@ function moveDown(index) {
       saveAndRender();
     }
 
-    /* ---------- SUB-ESCENAS ---------- */
-
-    /* ---------- GUARDAR ---------- */
     function saveAndRender() {
       localStorage.setItem("theatreCues", JSON.stringify(cues));
       renderTable();
       updateCueSelector();
     }
 
-    /* ---------- RESET ---------- */
     document.getElementById("reset").addEventListener("click", () => {
-      if (confirm("¿Seguro que quieres borrar esta obra? Asegurate de haber exportado primero")) {
+      if (confirm("Are you sure you want to delete all cues? Make sure you have exported them first!")) {
         cues = [];
         activeIndex = -1;
         localStorage.removeItem("theatreCues");
@@ -357,25 +342,22 @@ const exportBtn = document.getElementById("export");
 exportBtn.addEventListener("click", () => {  
   const doc = new jsPDF({ orientation: "landscape", unit: "mm" });
 
-  // ---------- CABECERA ----------
-  const titleText = title.value || "Guion técnico";
+  const titleText = title.value || "Tech script";
   doc.setFontSize(16);
   doc.text(titleText, 15, 15);
 
-  // cabecera técnica en una línea, texto más pequeño
   doc.setFontSize(10);
-  const metaText = `Última revisión: ${revision.value || ""} | Producción técnica por: ${tech.value || ""} | Contacto: ${email.value || ""} | ${phone.value || ""} `;
+  const metaText = `Last revision: ${revision.value || ""} | Tech script designed by: ${tech.value || ""} | Contact: ${email.value || ""} | ${phone.value || ""} `;
   doc.text(metaText, 15, 22);
 
-  // ---------- TABLA ----------
   doc.autoTable({
     startY: 28,
     head: [[
-      "Escena",
+      "Scene",
       "Trigger",
-      "Luces",
+      "Lights",
       "Audio",
-      "Vídeo"
+      "Video"
     ]],
     body: cues.map(c => [
       c.scene,
@@ -404,16 +386,14 @@ exportBtn.addEventListener("click", () => {
 
     const rowIndex = data.row.index;
 
-    // Fila par = blanca
     if (rowIndex % 2 === 0) {
       data.cell.styles.fillColor = [255, 255, 255];
     } else {
-      // Fila impar = color rotativo
       const colorCycle = [
-        [143, 184, 226], // azul claro
-        [227, 133, 135], // rojo claro
-        [254, 210, 84],  // amarillo claro
-        [168, 208, 151]  // verde claro
+        [143, 184, 226], 
+        [227, 133, 135], 
+        [254, 210, 84],  
+        [168, 208, 151]  
       ];
 
       const colorIndex = Math.floor(rowIndex / 2) % 4;
@@ -424,9 +404,8 @@ exportBtn.addEventListener("click", () => {
 
   });
 
-  // ---------- GUARDAR PDF ----------
   const safeTitle = titleText.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  doc.save(`guion-tecnico-${safeTitle}.pdf`);
+  doc.save(`tech-script-${safeTitle}.pdf`);
 });
 
 
@@ -438,20 +417,19 @@ exportDataBtn.addEventListener("click", () => {
     cues: cues
   };
 
-  // guardar campos de cabecera
   metaFields.forEach(id => {
     data.meta[id] = document.getElementById(id).value;
   });
 
-  const jsonStr = JSON.stringify(data, null, 2); // identado para legibilidad
+  const jsonStr = JSON.stringify(data, null, 2); 
 
   const blob = new Blob([jsonStr], { type: "application/json" });
   const url = URL.createObjectURL(blob);
 
   const a = document.createElement("a");
   a.href = url;
-  const titleText = document.getElementById("title").value || "Guion técnico";
-  const safeTitle = titleText.replace(/[^a-z0-9]/gi, '_').toLowerCase();  a.download = `guion-tecnico-${safeTitle}-datos.json`;
+  const titleText = document.getElementById("title").value || "Tech Script";
+  const safeTitle = titleText.replace(/[^a-z0-9]/gi, '_').toLowerCase();  a.download = `tech-script-${safeTitle}-editable.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -478,10 +456,10 @@ importDataBtn.addEventListener("click", () => {
           cues = data.cues;
           saveAndRender();
         } else {
-          alert("Archivo JSON inválido: no contiene cues");
+          alert("Invalid JSON: no cues inside");
         }
       } catch (err) {
-        alert("Error leyendo el archivo JSON");
+        alert("Unable to read JSON");
         console.error(err);
       }
     };
@@ -529,7 +507,7 @@ function updateCueSelector() {
 
   if (cues.length === 0) {
     const placeholder = document.createElement("option");
-    placeholder.textContent = "-- No hay cues --";
+    placeholder.textContent = "-- No cues yet --";
     placeholder.disabled = true;
     placeholder.selected = true;
     cueSelector.appendChild(placeholder);
