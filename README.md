@@ -1,7 +1,7 @@
 I created this simple web interface to easily create tech scripts for my theater shows, and quickly edit them during rehearsals.
+The online link is: https://nukethefox.github.io/My_cue_arranger/
 
 It includes two "jspdf" files, so I could use the interface's features offline (I found that some theaters have local Wi-Fi for remote access to the sound desk, but not internet access).
-
 You can download these three files and use them locally on your computer, without internet connection.
 
 The idea is very simple: the interface lets you create cues, with their corresponding trigger and actions, reorder them as needed, and then export them as PDF.
@@ -25,4 +25,4 @@ A PDF will be created with all the cues in their current order, and the scene nu
 The PDF will be formatted with alternating colors in the rows. It's designed this way for printing and use during the final show, so you can quickly see "okay, we are in the yellow row", if you need to look away from the paper (yeah, because during showtime you usually end up multitasking).
 You can fill in the information fields (production, designer name, contact) and this will be included in the PDF, in case you need to send it to others (director...).
 
-If you want to change the format of the final PDF, you can edit the code on lines 340 to 400.
+If you want to change the format of the final PDF, you have to edit the code on lines 340 to 400.
